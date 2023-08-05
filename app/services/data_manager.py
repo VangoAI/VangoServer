@@ -1,4 +1,5 @@
 import os
+import datetime
 import uuid
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -88,4 +89,61 @@ class DataManager:
         )
         return response["Items"][0] if response["Items"] else None
     
+    def create_file(self, user_id: str) -> dict:
+        """
+        Creates a new file in the files table with the given user ID.
+
+        Args:
+            user_id (str): The ID of the user to create the file for.
+        Returns:
+            dict: The file item from the files table.
+        """
+        file_id = str(uuid.uuid4())
+        self.files_table.put_item(Item={
+            "file_id": file_id,
+            "owner_id": user_id,
+            "file_name": "Untitled",
+            "last_edited": datetime.datetime.now().isoformat(),
+        })
+        return self.get_file(file_id)
     
+    def file_exists(self, file_id: str) -> bool:
+        """
+        Check if a file with the given ID exists.
+
+        Args:
+            file_id (str): The ID of the file to check.
+
+        Returns:
+            bool: True if the file exists, False otherwise.
+        """
+        return self.get_file(file_id) is not None
+    
+    def get_file(self, file_id: str) -> dict:
+        """
+        Retrieves a file from the files table based on the provided file ID.
+
+        Args:
+            file_id (str): The ID of the file to retrieve.
+
+        Returns:
+            dict: The file item from the files table.
+        """
+        response = self.files_table.get_item(Key={"file_id": file_id})
+        return response["Item"] if "Item" in response else None
+
+    def get_files(self, user_id: str) -> list[dict]:
+        """
+        Retrieves all files from the files table for the given user ID.
+
+        Args:
+            user_id (str): The ID of the user to retrieve files for.
+
+        Returns:
+            list[dict]: A list of file items from the files table.
+        """
+        response = self.files_table.query(
+            IndexName="owner_id_index",
+            KeyConditionExpression=Key('owner_id').eq(user_id)
+        )
+        return response["Items"]

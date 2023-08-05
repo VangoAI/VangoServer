@@ -3,7 +3,6 @@ import requests
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-
 class RequestManager:
     def __init__(self):
         self.GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
