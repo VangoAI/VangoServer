@@ -5,6 +5,11 @@ from app.utils import generate_token, token_required
 
 auth = Blueprint('auth', __name__)
 
+@auth.route('/check')
+@token_required
+def check(user_id):
+    return '', 200
+
 @auth.route('/google/login')
 def google_auth():
     authorization_url = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -26,8 +31,7 @@ def google_auth_callback():
     google_id, email, name = request_manager.get_google_user(auth_code)
     user = data_manager.get_user_from_google_id(google_id) if data_manager.google_id_exists(google_id) else data_manager.create_user(google_id, email, name)
     token = generate_token(user['user_id'])
-
-    response = make_response(redirect(f"{os.getenv('FRONTEND_BASE_URL')}/dashboard"))
+    response = make_response(redirect(f"{os.getenv('FRONTEND_BASE_URL')}/"))
     response.set_cookie('token', token, httponly=True)
     return response
 

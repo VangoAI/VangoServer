@@ -12,7 +12,6 @@ def token_required(f):
     @wraps(f)
     def decorator(*args, **kwargs):
         token = request.cookies.get('token')
-
         if not token:
             return jsonify({'message': 'Token is missing!'}), 401
 
