@@ -1,0 +1,3 @@
+[submodule "VangoUI"]
+	path = VangoUI
+	url = git@github.com:VangoAI/VangoUI.git
