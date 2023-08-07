@@ -34,7 +34,7 @@ class DataManager:
             "subscription_plan": "Free",
             "credits": 1,
         })
-        return self.get_user_from_user_id(user_id)
+        return self.get_user(user_id)
     
     def user_id_exists(self, user_id: str) -> bool:
         """
@@ -46,7 +46,7 @@ class DataManager:
         Returns:
             bool: True if the user exists, False otherwise.
         """
-        return self.get_user_from_user_id(user_id) is not None
+        return self.get_user(user_id) is not None
 
     def google_id_exists(self, google_id: str) -> bool:
         """
@@ -60,7 +60,7 @@ class DataManager:
         """
         return self.get_user_from_google_id(google_id) is not None
 
-    def get_user_from_user_id(self, user_id: str) -> dict | None:
+    def get_user(self, user_id: str) -> dict | None:
         """
         Retrieves a user from the users table based on the provided user ID.
 
@@ -99,6 +99,7 @@ class DataManager:
             dict: The file item from the files table.
         """
         file_id = str(uuid.uuid4())
+        self.files_bucket.put_object(Key=file_id, Body="")
         self.files_table.put_item(Item={
             "file_id": file_id,
             "owner_id": user_id,
@@ -148,7 +149,7 @@ class DataManager:
         )
         return response["Items"]
 
-    def get_file_contents(self, file_id: str) -> str:
+    def get_file_content(self, file_id: str) -> str:
         """
         Retrieves the contents of a file from the files bucket based on the provided file ID.
 
@@ -160,3 +161,20 @@ class DataManager:
         """
         file_object = self.files_bucket.Object(file_id)
         return file_object.get()["Body"].read().decode("utf-8")
+
+    def rename_file(self, file_id: str, file_name: str) -> dict:
+        """
+        Renames a file in the files table based on the provided file ID.
+
+        Args:
+            file_id (str): The ID of the file to rename.
+
+        Returns:
+            dict: The file item from the files table.
+        """
+        self.files_table.update_item(
+            Key={"file_id": file_id},
+            UpdateExpression="SET file_name = :file_name",
+            ExpressionAttributeValues={":file_name": file_name}
+        )
+        return self.get_file(file_id)
