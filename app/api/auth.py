@@ -5,7 +5,7 @@ from app.utils import generate_token, token_required
 
 auth = Blueprint('auth', __name__)
 
-@auth.route('/google/login')
+@auth.route('api/google/login')
 def google_auth():
     authorization_url = "https://accounts.google.com/o/oauth2/v2/auth"
     params = {
