@@ -147,3 +147,16 @@ class DataManager:
             KeyConditionExpression=Key('owner_id').eq(user_id)
         )
         return response["Items"]
+
+    def get_file_contents(self, file_id: str) -> str:
+        """
+        Retrieves the contents of a file from the files bucket based on the provided file ID.
+
+        Args:
+            file_id (str): The ID of the file to retrieve.
+
+        Returns:
+            str: The contents of the file.
+        """
+        file_object = self.files_bucket.Object(file_id)
+        return file_object.get()["Body"].read().decode("utf-8")
