@@ -3,6 +3,7 @@ import datetime
 import uuid
 import boto3
 from boto3.dynamodb.conditions import Key
+import json
 
 class DataManager:
     def __init__(self):
@@ -99,7 +100,19 @@ class DataManager:
             dict: The file item from the files table.
         """
         file_id = str(uuid.uuid4())
-        self.files_bucket.put_object(Key=file_id, Body="")
+
+        empty_workflow = {
+            "last_node_id": 0,
+            "last_link_id": 0,
+            "nodes": [],
+            "links": [],
+            "groups": [],
+            "config": {},
+            "extra": {},
+            "version": 0.4
+        }
+        
+        self.files_bucket.put_object(Key=file_id, Body=json.dumps(empty_workflow, indent=4))
         self.files_table.put_item(Item={
             "file_id": file_id,
             "owner_id": user_id,
@@ -178,3 +191,19 @@ class DataManager:
             ExpressionAttributeValues={":file_name": file_name}
         )
         return self.get_file(file_id)
+    
+    def save_file(self, file_id: str, content: str) -> None:
+        """
+        Saves the contents of a file to the files bucket based on the provided file ID.
+
+        Args:
+            file_id (str): The ID of the file to save.
+            content (str): The contents of the file.
+        """
+        file_object = self.files_bucket.Object(file_id)
+        file_object.put(Body=content)
+        self.files_table.update_item(
+            Key={"file_id": file_id},
+            UpdateExpression="SET last_edited = :last_edited",
+            ExpressionAttributeValues={":last_edited": datetime.datetime.now().isoformat()}
+        )

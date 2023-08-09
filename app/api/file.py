@@ -39,7 +39,7 @@ def get_file_content(user_id, file_id):
 
 @file.route('/<string:file_id>/save', methods=['POST'])
 @token_required
-def save_file(user_id, file_id):    
+def save_file(user_id, file_id):
     data_manager = current_app.data_manager
     try:
         data_manager.save_file(file_id, request.json['content'])
