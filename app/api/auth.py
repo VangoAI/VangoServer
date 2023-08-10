@@ -12,12 +12,14 @@ def check(user_id):
 
 @auth.route('/google/login')
 def google_auth():
+    redirect_after_login = request.args.get('redirect_after_login', os.getenv('FRONTEND_BASE_URL'))
     authorization_url = "https://accounts.google.com/o/oauth2/v2/auth"
     params = {
         "client_id": os.getenv("GOOGLE_CLIENT_ID"),
         "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
         "response_type": "code",
         "scope": "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
+        "state": redirect_after_login
     }
     return redirect(f"{authorization_url}?{urlencode(params)}")
 
@@ -27,11 +29,12 @@ def google_auth_callback():
     request_manager = current_app.request_manager
 
     auth_code = request.args.get('code')
+    redirect_after_login = request.args.get('state', '')
 
     google_id, email, name = request_manager.get_google_user(auth_code)
     user = data_manager.get_user_from_google_id(google_id) if data_manager.google_id_exists(google_id) else data_manager.create_user(google_id, email, name)
     token = generate_token(user['user_id'])
-    response = make_response(redirect(f"{os.getenv('FRONTEND_BASE_URL')}"))
+    response = make_response(redirect(f"{os.getenv('FRONTEND_BASE_URL')}{redirect_after_login}"))
     response.set_cookie('token', token, httponly=True)
     return response
 
