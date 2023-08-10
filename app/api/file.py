@@ -76,3 +76,13 @@ def rename_file(user_id, file_id):
     except Exception as e:
         return {"error renaming file": str(e)}, 500
     return file, 200
+
+@file.route('/<string:file_id>/copy', methods=['POST'])
+@token_required
+def copy_file(user_id, file_id):
+    data_manager = current_app.data_manager
+    try:
+        file = data_manager.copy_file(user_id, file_id)
+    except Exception as e:
+        return {"error copying file": str(e)}, 500
+    return file, 201

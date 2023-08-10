@@ -207,3 +207,22 @@ class DataManager:
             UpdateExpression="SET last_edited = :last_edited",
             ExpressionAttributeValues={":last_edited": datetime.datetime.now().isoformat()}
         )
+
+    def copy_file(self, user_id: str, file_id: str) -> dict:
+        """
+        Copies a file in the files table based on the provided file ID.
+
+        Args:
+            file_id (str): The ID of the file to copy.
+            user_id (str): The ID of the user to copy the file for.
+
+        Returns:
+            dict: The file item from the files table.
+        """
+        file = self.get_file(file_id)
+        file_content = self.get_file_content(file_id)
+        
+        new_file = self.create_file(user_id)
+        self.save_file(new_file["file_id"], file_content)
+        self.rename_file(new_file["file_id"], file["file_name"] + " (Copy)")
+        return new_file
