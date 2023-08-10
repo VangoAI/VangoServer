@@ -13,7 +13,7 @@ class RequestManager:
         Given an authorization code, returns the user's google ID, email, and name.
         '''
         url = "https://oauth2.googleapis.com/token"
-        redirect_uri = f"{os.getenv('BACKEND_BASE_URL')}/api/auth/google/callback"
+        redirect_uri = os.getenv('GOOGLE_REDIRECT_URI')
 
         payload = {
             "code": auth_code,

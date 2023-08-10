@@ -23,4 +23,4 @@ api.register_blueprint(user, url_prefix='/user')
 app.register_blueprint(api, url_prefix='/api')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0")
