@@ -14,7 +14,6 @@ def create_file(user_id):
     return file, 201
 
 @file.route('/<string:file_id>')
-@token_required
 def get_file(user_id, file_id):
     data_manager = current_app.data_manager
     try:
@@ -27,7 +26,6 @@ def get_file(user_id, file_id):
     return file, 200
 
 @file.route('/<string:file_id>/content')
-@token_required
 def get_file_content(user_id, file_id):
     data_manager = current_app.data_manager
     try:
