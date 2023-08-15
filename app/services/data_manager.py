@@ -12,6 +12,7 @@ class DataManager:
         dynamodb = session.resource('dynamodb')
 
         self.files_bucket = s3.Bucket("vangoui-files")
+        self.images_bucket = s3.Bucket("vango-logos")
         self.users_table = dynamodb.Table("Users")
         self.files_table = dynamodb.Table("Files")
     
@@ -221,8 +222,20 @@ class DataManager:
         """
         file = self.get_file(file_id)
         file_content = self.get_file_content(file_id)
-        
+
         new_file = self.create_file(user_id)
         self.save_file(new_file["file_id"], file_content)
         self.rename_file(new_file["file_id"], file["file_name"] + " (Copy)")
         return new_file
+
+    def get_images(self):
+        objects = self.images_bucket.objects.filter(Prefix="images/sdxl_eval_1/")
+        object_keys = [obj.key for obj in objects]
+        object_keys.sort(key=lambda key: (int(key.split('_')[3]), int(key.split('_')[4])))
+
+        s3_base_url = "https://{}.s3.us-west-2.amazonaws.com/".format(self.images_bucket.name)
+        s3_urls = []
+        for object_key in object_keys:
+            s3_url = s3_base_url + object_key
+            s3_urls.append(s3_url)
+        return s3_urls

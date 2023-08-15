@@ -86,3 +86,8 @@ def copy_file(user_id, file_id):
     except Exception as e:
         return {"error copying file": str(e)}, 500
     return file, 201
+
+@file.route('/images')
+def get_images():
+    data_manager = current_app.data_manager
+    return data_manager.get_images(), 200
