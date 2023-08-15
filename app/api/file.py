@@ -14,7 +14,7 @@ def create_file(user_id):
     return file, 201
 
 @file.route('/<string:file_id>')
-def get_file(user_id, file_id):
+def get_file(file_id):
     data_manager = current_app.data_manager
     try:
         file = data_manager.get_file(file_id)
@@ -26,7 +26,7 @@ def get_file(user_id, file_id):
     return file, 200
 
 @file.route('/<string:file_id>/content')
-def get_file_content(user_id, file_id):
+def get_file_content(file_id):
     data_manager = current_app.data_manager
     try:
         content = data_manager.get_file_content(file_id)
