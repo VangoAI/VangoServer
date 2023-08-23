@@ -117,7 +117,7 @@ class DataManager:
             "file_id": file_id,
             "owner_id": user_id,
             "file_name": "Untitled",
-            "last_edited": datetime.datetime.now().isoformat(),
+            "last_edited": datetime.datetime.utcnow().isoformat() + "Z",
         })
         return self.get_file(file_id)
     
