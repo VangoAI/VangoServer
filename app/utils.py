@@ -4,6 +4,7 @@ from functools import wraps
 
 from flask import request, jsonify
 import jwt
+import requests
 
 def token_required(f):
     """
@@ -52,3 +53,21 @@ def decode_token(token: str) -> str | None:
         return payload['user_id']
     except:
         return jsonify({'message': 'Token is invalid!'}), 401
+
+
+def upload_in_chunks(url, file):
+    chunk_size = 1024 * 1024 * 10
+    file_stream = file.stream
+
+    while True:
+        chunk_data = file_stream.read(chunk_size)
+        if len(chunk_data) == 0:
+            break
+            
+        files = {'file': (file.filename, chunk_data, file.mimetype)}
+        response = requests.post(url, files=files)
+        
+        if response.status_code != 200:
+            return f'Failed to upload chunk, status code: {response.status_code}', 400
+            
+    return 'File successfully uploaded', 200

@@ -8,6 +8,7 @@ from app.api.file import file
 from app.api.user import user
 from app.api.comfy import comfy
 from app.api.other import other
+from app.api.experiment import experiment
 from app.services.data_manager import DataManager
 from app.services.request_manager import RequestManager
 
@@ -23,6 +24,7 @@ api.register_blueprint(file, url_prefix='/file')
 api.register_blueprint(user, url_prefix='/user')
 api.register_blueprint(comfy, url_prefix='/comfy')
 api.register_blueprint(other, url_prefix='/other')
+api.register_blueprint(experiment, url_prefix='/experiment')
 
 app.register_blueprint(api, url_prefix='/api')
 
