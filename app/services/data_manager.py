@@ -14,6 +14,7 @@ class DataManager:
         self.files_bucket = s3.Bucket("vangoui-files")
         self.users_table = dynamodb.Table("Users")
         self.files_table = dynamodb.Table("Files")
+        self.experiments_table = dynamodb.Table("Experiments")
         self.images_bucket = s3.Bucket("vango-logos")
     
     def create_user(self, google_id: str, email: str, name: str) -> dict:
@@ -227,6 +228,106 @@ class DataManager:
         self.save_file(new_file["file_id"], file_content)
         self.rename_file(new_file["file_id"], file["file_name"] + " (Copy)")
         return new_file
+    
+    def get_experiment(self, experiment_id: str) -> dict:
+        """
+        Retrieves an experiment from the experiments table based on the provided experiment ID.
+
+        Args:
+            experiment_id (str): The ID of the experiment to retrieve.
+
+        Returns:
+            dict: The experiment item from the experiments table.
+        """
+        response = self.experiments_table.get_item(Key={"experiment_id": experiment_id})
+        return response["Item"] if "Item" in response else None
+    
+    def get_experiments(self, user_id: str) -> list[dict]:
+        """
+        Retrieves all experiments from the experiments table for the given user ID.
+
+        Args:
+            user_id (str): The ID of the user to retrieve experiments for.
+
+        Returns:
+            list[dict]: A list of experiment items from the experiments table.
+        """
+        response = self.experiments_table.query(
+            IndexName="owner_id_index",
+            KeyConditionExpression=Key('owner_id').eq(user_id)
+        )
+        return response["Items"]
+    
+    def create_experiment(self, user_id: str) -> dict:
+        """
+        Creates a new experiment in the experiments table with the given user ID.
+
+        Args:
+            user_id (str): The ID of the user to create the experiment for.
+        Returns:
+            dict: The experiment item from the experiments table.
+        """
+        experiment_id = str(uuid.uuid4())
+        experiment_parameters = {
+            "models": ["sd_xl_base_1.0.safetensors"],
+            "prompts": ["A photo of a cat"],
+            "seeds": [1],
+            "steps": [30],
+            "cfgs": [8],
+            "denoises": [1],
+            "widths": [1024],
+            "heights": [1024],
+            "samplers": ["euler"],
+            "schedulers": ["normal"],
+        }
+        grid = {
+            "x_axis": "",
+            "y_axis": "",
+            "z_axis": "",
+        }
+
+        self.experiments_table.put_item(Item={
+            "experiment_id": experiment_id,
+            "name": "Untitled Experiment",
+            "owner_id": user_id,
+            "experiment_parameters": experiment_parameters,
+            "grid": grid,
+            "runs": 0,
+            "last_edited": datetime.datetime.utcnow().isoformat() + "Z",
+        })
+        return self.get_experiment(experiment_id)
+    
+    def save_experiment(self, experiment_id: str, experiment: dict) -> None:
+        """
+        Saves the experiment parameters of an experiment in the experiments table based on the provided experiment ID.
+
+        Args:
+            experiment_id (str): The ID of the experiment to save.
+            experiment_parameters (dict): The experiment parameters.
+        """
+        self.experiments_table.update_item(
+            Key={"experiment_id": experiment_id},
+            UpdateExpression="SET experiment_parameters = :experiment_parameters, grid = :grid, runs = :runs, last_edited = :last_edited",
+            ExpressionAttributeValues={":experiment_parameters": experiment["experiment_parameters"], ":grid": experiment["grid"], ":runs": experiment["runs"], ":last_edited": datetime.datetime.utcnow().isoformat() + "Z"}
+        )
+
+    def rename_experiment(self, experiment_id: str, name: str) -> dict:
+        """
+        Renames an experiment in the experiments table based on the provided experiment ID.
+
+        Args:
+            experiment_id (str): The ID of the experiment to rename.
+
+        Returns:
+            dict: The experiment item from the experiments table.
+        """
+        self.experiments_table.update_item(
+            Key={"experiment_id": experiment_id},
+            UpdateExpression="SET #n = :name, last_edited = :last_edited",
+            ExpressionAttributeNames={"#n": "name"},
+            ExpressionAttributeValues={":name": name, ":last_edited": datetime.datetime.utcnow().isoformat() + "Z"}
+        )
+        return self.get_experiment(experiment_id)
 
     def get_images(self):
         objects = self.images_bucket.objects.filter(Prefix="images/sdxl_eval_1/")
