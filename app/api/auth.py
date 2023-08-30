@@ -35,7 +35,7 @@ def google_auth_callback():
     user = data_manager.get_user_from_google_id(google_id) if data_manager.google_id_exists(google_id) else data_manager.create_user(google_id, email, name)
     token = generate_token(user['user_id'])
     response = make_response(redirect(f"{os.getenv('FRONTEND_BASE_URL')}{redirect_after_login}"))
-    response.set_cookie('token', token, httponly=True)
+    response.set_cookie('token', token, httponly=True, max_age=60*60*24*7) # 7 days
     return response
 
 @auth.route('/logout')
