@@ -2,6 +2,7 @@ from flask import current_app, Blueprint, request
 from app.utils import token_required
 import json
 import requests
+import itertools
 
 experiment = Blueprint('experiment', __name__)
 
@@ -102,19 +103,19 @@ type GridObj = {
 '''
 
 from decimal import Decimal
-def find_decimal(obj):
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if isinstance(v, Decimal):
-                print(f"Decimal found: Key = {k}, Value = {v}")
-            else:
-                find_decimal(v)
-    elif isinstance(obj, list):
-        for i, v in enumerate(obj):
-            if isinstance(v, Decimal):
-                print(f"Decimal found: Index = {i}, Value = {v}")
-            else:
-                find_decimal(v)
+
+mapping = {
+    'models': ("1", "inputs", "ckpt_name"),
+    'prompts': ("1", "inputs", "positive"),
+    'seeds': ("2", "inputs", "seed"),
+    'steps': ("2", "inputs", "steps"),
+    'cfgs': ("2", "inputs", "cfg"),
+    'widths': ("1", "inputs", "empty_latent_width"),
+    'heights': ("1", "inputs", "empty_latent_height"),
+    'samplers': ("2", "inputs", "sampler_name"),
+    'schedulers': ("2", "inputs", "scheduler"),
+    'denoises': ("2", "inputs", "denoise")
+}
 
 
 @experiment.route('/<string:experiment_id>/run', methods=['POST'])
@@ -126,26 +127,23 @@ def run(user_id, experiment_id):
 
     API_URL = 'https://server1.vango.ai'
 
-    number = 0
-    for k in range(len(experiment["experiment_parameters"][experiment["grid"]["z_axis"]])):
-        for j in range(len(experiment["experiment_parameters"][experiment["grid"]["y_axis"]])):
-            for i in range(len(experiment["experiment_parameters"][experiment["grid"]["x_axis"]])):
-                experiment_workflow = json.loads(experiment_workflow_string)
-                experiment_workflow["1"]["inputs"]["ckpt_name"] = experiment["experiment_parameters"]["models"][i if experiment["grid"]["x_axis"] == "models" else (j if experiment["grid"]["y_axis"] == "models" else (k if experiment["grid"]["z_axis"] == "models" else 0))]
-                experiment_workflow["1"]["inputs"]["positive"] = experiment["experiment_parameters"]["prompts"][i if experiment["grid"]["x_axis"] == "prompts" else (j if experiment["grid"]["y_axis"] == "prompts" else (k if experiment["grid"]["z_axis"] == "prompts" else 0))]
-                experiment_workflow["2"]["inputs"]["seed"] = int(experiment["experiment_parameters"]["seeds"][i if experiment["grid"]["x_axis"] == "seeds" else (j if experiment["grid"]["y_axis"] == "seeds" else (k if experiment["grid"]["z_axis"] == "seeds" else 0))])
-                experiment_workflow["2"]["inputs"]["steps"] = int(experiment["experiment_parameters"]["steps"][i if experiment["grid"]["x_axis"] == "steps" else (j if experiment["grid"]["y_axis"] == "steps" else (k if experiment["grid"]["z_axis"] == "steps" else 0))])
-                experiment_workflow["2"]["inputs"]["cfg"] = float(experiment["experiment_parameters"]["cfgs"][i if experiment["grid"]["x_axis"] == "cfgs" else (j if experiment["grid"]["y_axis"] == "cfgs" else (k if experiment["grid"]["z_axis"] == "cfgs" else 0))])
-                experiment_workflow["1"]["inputs"]["empty_latent_width"] = int(experiment["experiment_parameters"]["widths"][i if experiment["grid"]["x_axis"] == "widths" else (j if experiment["grid"]["y_axis"] == "widths" else (k if experiment["grid"]["z_axis"] == "widths" else 0))])
-                experiment_workflow["1"]["inputs"]["empty_latent_height"] = int(experiment["experiment_parameters"]["heights"][i if experiment["grid"]["x_axis"] == "heights" else (j if experiment["grid"]["y_axis"] == "heights" else (k if experiment["grid"]["z_axis"] == "heights" else 0))])
-                experiment_workflow["2"]["inputs"]["sampler_name"] = experiment["experiment_parameters"]["samplers"][i if experiment["grid"]["x_axis"] == "samplers" else (j if experiment["grid"]["y_axis"] == "samplers" else (k if experiment["grid"]["z_axis"] == "samplers" else 0))]
-                experiment_workflow["2"]["inputs"]["scheduler"] = experiment["experiment_parameters"]["schedulers"][i if experiment["grid"]["x_axis"] == "schedulers" else (j if experiment["grid"]["y_axis"] == "schedulers" else (k if experiment["grid"]["z_axis"] == "schedulers" else 0))]
-                experiment_workflow["2"]["inputs"]["denoise"] = float(experiment["experiment_parameters"]["denoises"][i if experiment["grid"]["x_axis"] == "denoises" else (j if experiment["grid"]["y_axis"] == "denoises" else (k if experiment["grid"]["z_axis"] == "denoises" else 0))])
-                experiment_workflow["9"]["inputs"]["filename_prefix"] = f"experiment/{experiment['experiment_id']}/{experiment['runs']}/{i}_{j}_{k}.png"
+    sorted_keys = sorted(experiment["experiment_parameters"].keys())
+    params_indices = [range(len(experiment["experiment_parameters"][key])) for key in sorted_keys]
+    index_combinations = list(itertools.product(*params_indices))
+    combinations = [dict(zip(sorted_keys, combination)) for combination in index_combinations]
 
-                response = requests.post(f'{API_URL}/prompt', json={"prompt": experiment_workflow, "number": number }, headers={"Content-Type": "application/json"})
-                print(response.json())
-                number += 1
+    for combination in combinations:
+        experiment_workflow = json.loads(experiment_workflow_string)
+        for key, value in combination.items():
+            val = experiment["experiment_parameters"][key][value]
+            if isinstance(val, Decimal):
+                val = float(val)
+            experiment_workflow[mapping[key][0]][mapping[key][1]][mapping[key][2]] = val
+        experiment_workflow["9"]["inputs"]["filename_prefix"] = f"experiment/{experiment_id}/" + "_".join([str(combination[key]) for key in sorted(combination.keys())]) + ".png"
+        response = requests.post(f'{API_URL}/prompt', json={"prompt": experiment_workflow}, headers={"Content-Type": "application/json"})
+        print(response.json())
+        print("file", f"experiment/{experiment_id}/" + "_".join([str(combination[key]) for key in sorted(combination.keys())]) + ".png")
+
     return "", 200
 
 

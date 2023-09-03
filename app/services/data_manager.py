@@ -4,6 +4,7 @@ import uuid
 import boto3
 from boto3.dynamodb.conditions import Key
 import json
+from ..models.experiment import Experiment
 
 class DataManager:
     def __init__(self):
@@ -267,48 +268,23 @@ class DataManager:
         Returns:
             dict: The experiment item from the experiments table.
         """
-        experiment_id = str(uuid.uuid4())
-        experiment_parameters = {
-            "models": ["sd_xl_base_1.0.safetensors"],
-            "prompts": ["A photo of a cat"],
-            "seeds": [1],
-            "steps": [30],
-            "cfgs": [8],
-            "denoises": [1],
-            "widths": [1024],
-            "heights": [1024],
-            "samplers": ["euler"],
-            "schedulers": ["normal"],
-        }
-        grid = {
-            "x_axis": "",
-            "y_axis": "",
-            "z_axis": "",
-        }
-
-        self.experiments_table.put_item(Item={
-            "experiment_id": experiment_id,
-            "name": "Untitled Experiment",
-            "owner_id": user_id,
-            "experiment_parameters": experiment_parameters,
-            "grid": grid,
-            "runs": 0,
-            "last_edited": datetime.datetime.utcnow().isoformat() + "Z",
-        })
-        return self.get_experiment(experiment_id)
+        experiment = Experiment.default(user_id)
+        experiment_dict = experiment.to_dict()
+        self.experiments_table.put_item(Item=experiment_dict)
+        return experiment_dict
     
     def save_experiment(self, experiment_id: str, experiment: dict) -> None:
         """
-        Saves the experiment parameters of an experiment in the experiments table based on the provided experiment ID.
+        Saves the experiment to the experiments table based on the provided experiment ID.
 
         Args:
             experiment_id (str): The ID of the experiment to save.
-            experiment_parameters (dict): The experiment parameters.
+            experiment (dict): The experiment.
         """
         self.experiments_table.update_item(
             Key={"experiment_id": experiment_id},
-            UpdateExpression="SET experiment_parameters = :experiment_parameters, grid = :grid, runs = :runs, last_edited = :last_edited",
-            ExpressionAttributeValues={":experiment_parameters": experiment["experiment_parameters"], ":grid": experiment["grid"], ":runs": experiment["runs"], ":last_edited": datetime.datetime.utcnow().isoformat() + "Z"}
+            UpdateExpression="SET experiment_parameters = :experiment_parameters, cells = :cells, grid = :grid, runs = :runs, last_edited = :last_edited",
+            ExpressionAttributeValues={":experiment_parameters": experiment["experiment_parameters"], ":cells": experiment["cells"], ":grid": experiment["grid"], ":runs": experiment["runs"], ":last_edited": datetime.datetime.utcnow().isoformat() + "Z"}
         )
 
     def rename_experiment(self, experiment_id: str, name: str) -> dict:
