@@ -16,6 +16,7 @@ class DataManager:
         self.users_table = dynamodb.Table("Users")
         self.files_table = dynamodb.Table("Files")
         self.experiments_table = dynamodb.Table("Experiments")
+        self.experiment_runs_table = dynamodb.Table("ExperimentRuns")
         self.images_bucket = s3.Bucket("vango-logos")
     
     def create_user(self, google_id: str, email: str, name: str) -> dict:
@@ -283,8 +284,8 @@ class DataManager:
         """
         self.experiments_table.update_item(
             Key={"experiment_id": experiment_id},
-            UpdateExpression="SET experiment_parameters = :experiment_parameters, cells = :cells, grid = :grid, runs = :runs, last_edited = :last_edited",
-            ExpressionAttributeValues={":experiment_parameters": experiment["experiment_parameters"], ":cells": experiment["cells"], ":grid": experiment["grid"], ":runs": experiment["runs"], ":last_edited": datetime.datetime.utcnow().isoformat() + "Z"}
+            UpdateExpression="SET cells = :cells, run_ids = :run_ids, last_edited = :last_edited",
+            ExpressionAttributeValues={":cells": experiment["cells"], ":run_ids": experiment["run_ids"], ":last_edited": datetime.datetime.utcnow().isoformat() + "Z"}
         )
 
     def rename_experiment(self, experiment_id: str, name: str) -> dict:
@@ -304,6 +305,43 @@ class DataManager:
             ExpressionAttributeValues={":name": name, ":last_edited": datetime.datetime.utcnow().isoformat() + "Z"}
         )
         return self.get_experiment(experiment_id)
+    
+    def create_run(self, experiment_id: str, name: str, experiment_parameters: dict) -> dict:
+        """
+        Creates a new run in the experiment runs table with the given experiment ID, name, and parameters.
+
+        Args:
+            experiment_id (str): The ID of the experiment to create the run for.
+            name (str): The name of the run.
+            experiment_parameters (dict): The parameters of the run.
+        Returns:
+            dict: The run item from the experiment runs table.
+        """
+        run_id = str(uuid.uuid4())
+        self.experiment_runs_table.put_item(Item={
+            "run_id": run_id,
+            "experiment_id": experiment_id,
+            "name": name,
+            "parameters": experiment_parameters,
+            "date": datetime.datetime.utcnow().isoformat() + "Z",
+        })
+        experiment = self.get_experiment(experiment_id)
+        experiment["run_ids"].append(run_id)
+        self.save_experiment(experiment_id, experiment)
+        return self.get_run(run_id)
+    
+    def get_run(self, run_id: str) -> dict:
+        """
+        Retrieves a run from the experiment runs table based on the provided run ID.
+
+        Args:
+            run_id (str): The ID of the run to retrieve.
+
+        Returns:
+            dict: The run item from the experiment runs table.
+        """
+        response = self.experiment_runs_table.get_item(Key={"run_id": run_id})
+        return response["Item"] if "Item" in response else None
 
     def get_images(self):
         objects = self.images_bucket.objects.filter(Prefix="images/sdxl_eval_1/")

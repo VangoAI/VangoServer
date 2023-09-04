@@ -2,13 +2,12 @@ import uuid
 from datetime import datetime
 
 class Experiment:
-    def __init__(self, experiment_id: str, name: str, owner_id: str, experiment_parameters: 'ExperimentParameters', cells: ['ExperimentCell'], runs: int, last_edited: datetime):
+    def __init__(self, experiment_id: str, name: str, owner_id: str, cells: ['ExperimentCell'], run_ids: [str], last_edited: datetime):
         self.experiment_id = experiment_id
         self.name = name
         self.owner_id = owner_id
-        self.experiment_parameters = experiment_parameters
         self.cells = cells
-        self.runs = runs
+        self.run_ids = run_ids
         self.last_edited = last_edited
 
     def default(owner_id: str) -> 'Experiment':
@@ -16,9 +15,8 @@ class Experiment:
             experiment_id=str(uuid.uuid4()),
             name="Untitled Experiment",
             owner_id=owner_id,
-            experiment_parameters=ExperimentParameters.default(),
             cells=[GridSliceCell.default()],
-            runs=0,
+            run_ids=[],
             last_edited=datetime.now()
         )
     
@@ -27,10 +25,32 @@ class Experiment:
             "experiment_id": self.experiment_id,
             "name": self.name,
             "owner_id": self.owner_id,
-            "experiment_parameters": self.experiment_parameters.to_dict(),
             "cells": [cell.to_dict() for cell in self.cells],
-            "runs": self.runs,
+            "run_ids": self.run_ids,
             "last_edited": self.last_edited.isoformat() + "Z",
+        }
+    
+class ExperimentRun:
+    def __init__(self, run_id: str, name: str, parameters: 'ExperimentParameters', date: datetime):
+        self.run_id = run_id
+        self.name = name
+        self.parameters = parameters
+        self.date = date
+
+    def default(name: str, parameters: 'ExperimentParameters') -> 'ExperimentRun':
+        return ExperimentRun(
+            run_id=str(uuid.uuid4()),
+            name=name,
+            parameters=parameters,
+            date=datetime.now()
+        )
+    
+    def to_dict(self):
+        return {
+            "run_id": self.run_id,
+            "name": self.name,
+            "parameters": self.parameters.to_dict(),
+            "date": self.date.isoformat() + "Z",
         }
 
 class ExperimentParameters:

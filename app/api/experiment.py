@@ -118,31 +118,30 @@ mapping = {
 }
 
 
-@experiment.route('/<string:experiment_id>/run', methods=['POST'])
+@experiment.route('/run/<string:run_id>/start', methods=['POST'])
 @token_required
-def run(user_id, experiment_id):
+def run(user_id, run_id):
     data_manager = current_app.data_manager
 
-    experiment = data_manager.get_experiment(experiment_id)
+    run = data_manager.get_run(run_id)
 
     API_URL = 'https://server1.vango.ai'
 
-    sorted_keys = sorted(experiment["experiment_parameters"].keys())
-    params_indices = [range(len(experiment["experiment_parameters"][key])) for key in sorted_keys]
+    sorted_keys = sorted(run["parameters"].keys())
+    params_indices = [range(len(run["parameters"][key])) for key in sorted_keys]
     index_combinations = list(itertools.product(*params_indices))
     combinations = [dict(zip(sorted_keys, combination)) for combination in index_combinations]
 
     for combination in combinations:
         experiment_workflow = json.loads(experiment_workflow_string)
         for key, value in combination.items():
-            val = experiment["experiment_parameters"][key][value]
+            val = run["parameters"][key][value]
             if isinstance(val, Decimal):
                 val = float(val)
             experiment_workflow[mapping[key][0]][mapping[key][1]][mapping[key][2]] = val
-        experiment_workflow["9"]["inputs"]["filename_prefix"] = f"experiment/{experiment_id}/" + "_".join([str(combination[key]) for key in sorted(combination.keys())]) + ".png"
+        experiment_workflow["9"]["inputs"]["filename_prefix"] = f"run/{run_id}/" + "_".join([str(combination[key]) for key in sorted(combination.keys())]) + ".png"
         response = requests.post(f'{API_URL}/prompt', json={"prompt": experiment_workflow}, headers={"Content-Type": "application/json"})
         print(response.json())
-        print("file", f"experiment/{experiment_id}/" + "_".join([str(combination[key]) for key in sorted(combination.keys())]) + ".png")
 
     return "", 200
 
@@ -205,3 +204,28 @@ def rename_experiment(user_id, experiment_id):
     except Exception as e:
         return {"error renaming experiment": str(e)}, 500
     return experiment, 200
+
+@experiment.route('/<string:experiment_id>/run/create', methods=['POST'])
+@token_required
+def create_run(user_id, experiment_id):
+    data_manager = current_app.data_manager
+    print("abc")
+    try:
+        run = data_manager.create_run(experiment_id, request.json['name'], request.json['experiment_parameters'])
+    except Exception as e:
+        print("error", e)
+        return {"error creating run": str(e)}, 500
+    return run, 200
+
+@experiment.route('/run/<string:run_id>')
+@token_required
+def get_run(user_id, run_id):
+    data_manager = current_app.data_manager
+    try:
+        run = data_manager.get_run(run_id)
+    except Exception as e:
+        return {"error getting run": str(e)}, 500
+
+    if not run:
+        return '', 404
+    return run, 200
