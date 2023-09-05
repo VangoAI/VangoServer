@@ -4,6 +4,8 @@ import json
 import requests
 import itertools
 
+from ..utils import floats_to_decimals
+
 experiment = Blueprint('experiment', __name__)
 
 experiment_workflow_string = """
@@ -209,11 +211,10 @@ def rename_experiment(user_id, experiment_id):
 @token_required
 def create_run(user_id, experiment_id):
     data_manager = current_app.data_manager
-    print("abc")
     try:
-        run = data_manager.create_run(experiment_id, request.json['name'], request.json['experiment_parameters'])
+        run = data_manager.create_run(experiment_id, request.json['name'], floats_to_decimals(request.json['experiment_parameters']))
     except Exception as e:
-        print("error", e)
+        print(e)
         return {"error creating run": str(e)}, 500
     return run, 200
 

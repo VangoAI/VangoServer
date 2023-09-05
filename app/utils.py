@@ -1,6 +1,7 @@
 import os
 import datetime
 from functools import wraps
+from decimal import Decimal
 
 from flask import request, jsonify
 import jwt
@@ -71,3 +72,13 @@ def upload_in_chunks(url, file):
             return f'Failed to upload chunk, status code: {response.status_code}', 400
             
     return 'File successfully uploaded', 200
+
+def floats_to_decimals(data):
+    if isinstance(data, float):
+        return Decimal(str(data))
+    elif isinstance(data, dict):
+        return {key: floats_to_decimals(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [floats_to_decimals(value) for value in data]
+    else:
+        return data
