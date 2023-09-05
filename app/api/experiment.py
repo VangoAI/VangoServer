@@ -147,13 +147,6 @@ def run(user_id, run_id):
 
     return "", 200
 
-
-@experiment.route('/<string:experiment_id>/results', methods=['GET'])
-@token_required
-def get_results(user_id, experiment_id):
-    data_manager = current_app.data_manager
-    return data_manager.get_images(), 200
-
 @experiment.route('/<string:experiment_id>')
 @token_required
 def get_experiment(user_id, experiment_id):
@@ -214,7 +207,6 @@ def create_run(user_id, experiment_id):
     try:
         run = data_manager.create_run(experiment_id, request.json['name'], floats_to_decimals(request.json['experiment_parameters']))
     except Exception as e:
-        print(e)
         return {"error creating run": str(e)}, 500
     return run, 200
 

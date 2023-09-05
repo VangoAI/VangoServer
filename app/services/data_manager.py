@@ -78,6 +78,44 @@ class DataManager:
         response = self.users_table.get_item(Key={"user_id": user_id})
         return response["Item"] if "Item" in response else None
     
+    def get_users(self, user_ids: list[str]) -> list[dict]:
+        """
+        Retrieves multiple users from the users table based on the provided user IDs.
+
+        Args:
+            user_ids (list[str]): The IDs of the users to retrieve.
+
+        Returns:
+            list[dict]: List of user items from the users table.
+        """
+        unique_user_ids = list(set(user_ids))
+        keys = [{"user_id": user_id} for user_id in unique_user_ids]
+        response = self.users_table.meta.client.batch_get_item(
+            RequestItems={
+                'Users': {
+                    'Keys': keys
+                }
+            }
+        )
+        
+        retrieved_users = response['Responses']['Users']
+        retrieved_users_dict = {user['user_id']: user for user in retrieved_users}
+        final_result = [retrieved_users_dict.get(user_id, "") for user_id in user_ids]
+        return final_result
+    
+    def get_usernames(self, user_ids: list[str]) -> list[str]:
+        """
+        Retrieves the usernames of the users with the given user IDs.
+
+        Args:
+            user_ids (list[str]): The IDs of the users to retrieve usernames for.
+
+        Returns:
+            list[str]: A list of usernames.
+        """
+        users = self.get_users(user_ids)
+        return [user["username"] for user in users]
+    
     def get_user_from_google_id(self, google_id: str) -> dict | None:
         """
         Retrieves a user from the users table based on the provided Google ID.
@@ -342,15 +380,3 @@ class DataManager:
         """
         response = self.experiment_runs_table.get_item(Key={"run_id": run_id})
         return response["Item"] if "Item" in response else None
-
-    def get_images(self):
-        objects = self.images_bucket.objects.filter(Prefix="images/sdxl_eval_1/")
-        object_keys = [obj.key for obj in objects]
-        object_keys.sort(key=lambda key: (int(key.split('_')[3]), int(key.split('_')[4])))
-
-        s3_base_url = "https://{}.s3.us-west-2.amazonaws.com/".format(self.images_bucket.name)
-        s3_urls = []
-        for object_key in object_keys:
-            s3_url = s3_base_url + object_key
-            s3_urls.append(s3_url)
-        return s3_urls
