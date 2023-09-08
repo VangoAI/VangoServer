@@ -5,19 +5,23 @@ import boto3
 from boto3.dynamodb.conditions import Key
 import json
 from ..models.experiment import Experiment
+from werkzeug.datastructures import FileStorage
 
 class DataManager:
     def __init__(self):
         session = boto3.Session(aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"), region_name="us-west-2")
         s3 = session.resource('s3')
+        self.s3_client = session.client('s3')
         dynamodb = session.resource('dynamodb')
 
         self.files_bucket = s3.Bucket("vangoui-files")
+        self.images_bucket = s3.Bucket("vango-logos")
+        self.models_bucket = s3.Bucket("vango-models")
         self.users_table = dynamodb.Table("Users")
         self.files_table = dynamodb.Table("Files")
         self.experiments_table = dynamodb.Table("Experiments")
         self.experiment_runs_table = dynamodb.Table("ExperimentRuns")
-        self.images_bucket = s3.Bucket("vango-logos")
+        self.models_table = dynamodb.Table("Models")
     
     def create_user(self, google_id: str, email: str, name: str) -> dict:
         """
@@ -380,3 +384,131 @@ class DataManager:
         """
         response = self.experiment_runs_table.get_item(Key={"run_id": run_id})
         return response["Item"] if "Item" in response else None
+    
+    def create_model(self, user_id: str, name: str, s3_url: str) -> dict:
+        """
+        Creates a new model in the models table with the given user ID, name, and S3 URL.
+
+        Args:
+            user_id (str): The ID of the user to create the model for.
+            name (str): The name of the model.
+            s3_url (str): The S3 URL of the model.
+        Returns:
+            dict: The model item from the models table.
+        """
+        model_id = str(uuid.uuid4())
+        self.models_table.put_item(Item={
+            "model_id": model_id,
+            "name": name,
+            "owner_id": user_id,
+            "s3_url": s3_url,
+            "last_edited": datetime.datetime.utcnow().isoformat() + "Z",
+        })
+        return self.get_model(model_id)
+    
+    def get_model(self, model_id: str) -> dict:
+        """
+        Retrieves a model from the models table based on the provided model ID.
+
+        Args:
+            model_id (str): The ID of the model to retrieve.
+
+        Returns:
+            dict: The model item from the models table.
+        """
+        response = self.models_table.get_item(Key={"model_id": model_id})
+        return response["Item"] if "Item" in response else None
+    
+    def get_models(self, model_ids: [str]) -> list[dict]:
+        """
+        Retrieves multiple models from the models table based on the provided model IDs.
+
+        Args:
+            model_ids (list[str]): The IDs of the models to retrieve.
+
+        Returns:
+            list[dict]: List of model items from the models table.
+        """
+        keys = [{"model_id": model_id} for model_id in model_ids]
+        response = self.models_table.meta.client.batch_get_item(
+            RequestItems={
+                'Models': {
+                    'Keys': keys
+                }
+            }
+        )
+        return response['Responses']['Models']
+
+    def list_models(self, user_id: str) -> dict:
+        """
+        Retrieves all models from the models table for the given user ID.
+
+        Args:
+            user_id (str): The ID of the user to retrieve models for.
+
+        Returns:
+            dict: A dictionary of model items from the models table.
+        """
+        response = self.models_table.query(
+            IndexName="owner_id_index",
+            KeyConditionExpression=Key('owner_id').eq(user_id)
+        )
+        return response["Items"]
+    
+    def start_upload(self, num_parts: int) -> dict:
+        """
+        Starts an upload to the models bucket with the given number of parts.
+
+        Args:
+            num_parts (int): The number of parts to upload.
+
+        Returns:
+            tuple: The model ID, upload ID, and presigned URLs.
+        """
+        model_id = str(uuid.uuid4())
+        upload_id = self.s3_client.create_multipart_upload(Bucket='vango-models', Key=model_id)["UploadId"]
+
+        presigned_urls = []
+        for i in range(num_parts):
+            presigned_url = self.models_bucket.meta.client.generate_presigned_url(
+                ClientMethod='upload_part',
+                Params={
+                    'Bucket': 'vango-models',
+                    'Key': model_id,
+                    'UploadId': upload_id,
+                    'PartNumber': i + 1
+                }
+            )
+            presigned_urls.append(presigned_url)
+        
+        return model_id, upload_id, presigned_urls
+    
+    def complete_upload(self, user_id: str, model_id: str, name: str, upload_id: str, parts: list[dict]) -> None:
+        """
+        Completes an upload to the models bucket with the given model ID, upload ID, and parts.
+
+        Args:
+            model_id (str): The ID of the model to complete the upload for.
+            upload_id (str): The ID of the upload to complete.
+            parts (list[dict]): The parts of the upload.
+        """
+        self.models_bucket.meta.client.complete_multipart_upload(
+            Bucket="vango-models",
+            Key=model_id,
+            UploadId=upload_id,
+            MultipartUpload={"Parts": parts}
+        )
+        return self.create_model(user_id, name, f"https://vango-models.s3-us-west-2.amazonaws.com/{model_id}")
+
+    def get_images(self):
+        objects = self.images_bucket.objects.filter(Prefix="images/sdxl_eval_1/")
+        object_keys = [obj.key for obj in objects]
+        object_keys.sort(key=lambda key: (int(key.split('_')[3]), int(key.split('_')[4])))
+
+        s3_base_url = "https://{}.s3.us-west-2.amazonaws.com/".format(self.images_bucket.name)
+        s3_urls = []
+        for object_key in object_keys:
+            s3_url = s3_base_url + object_key
+            s3_urls.append(s3_url)
+        return s3_urls
+    

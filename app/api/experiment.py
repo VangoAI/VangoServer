@@ -3,6 +3,7 @@ from app.utils import token_required
 import json
 import requests
 import itertools
+import time
 
 from ..utils import floats_to_decimals
 
@@ -123,11 +124,26 @@ mapping = {
 @experiment.route('/run/<string:run_id>/start', methods=['POST'])
 @token_required
 def run(user_id, run_id):
+    API_URL = 'https://server1.vango.ai'
     data_manager = current_app.data_manager
 
     run = data_manager.get_run(run_id)
+    models = data_manager.get_models(run["parameters"]["models"])
+    for model in models:
+        response = requests.post(f'{API_URL}/download/checkpoint', json={"model_id": model["model_id"], "s3_url": model["s3_url"]}, headers={"Content-Type": "application/json"})
+        print("status", response.status_code)
 
-    API_URL = 'https://server1.vango.ai'
+    models_copy = models[:]
+    while models_copy:
+        i = 0
+        while i < len(models_copy):
+            response = requests.get(f'{API_URL}/download/checkpoint/status/{model["model_id"]}')
+            print(response.status_code, response.json(), response.json()["status"])
+            if response.json()["status"] == True:
+                models_copy.pop(i)
+            else:
+                i += 1
+        time.sleep(10)
 
     sorted_keys = sorted(run["parameters"].keys())
     params_indices = [range(len(run["parameters"][key])) for key in sorted_keys]
@@ -142,6 +158,7 @@ def run(user_id, run_id):
                 val = float(val)
             experiment_workflow[mapping[key][0]][mapping[key][1]][mapping[key][2]] = val
         experiment_workflow["9"]["inputs"]["filename_prefix"] = f"run/{run_id}/" + "_".join([str(combination[key]) for key in sorted(combination.keys())]) + ".png"
+        experiment_workflow["1"]["inputs"]["ckpt_name"] += ".safetensors"
         response = requests.post(f'{API_URL}/prompt', json={"prompt": experiment_workflow}, headers={"Content-Type": "application/json"})
         print(response.json())
 

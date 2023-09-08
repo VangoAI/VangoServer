@@ -68,7 +68,7 @@ class ExperimentParameters:
 
     def default() -> 'ExperimentParameters':
         return ExperimentParameters(
-            models=["sd_xl_base_1.0.safetensors"],
+            models=[],
             prompts=["A photo of a cat"],
             seeds=[1],
             steps=[30],
