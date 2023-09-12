@@ -129,18 +129,20 @@ def run(user_id, run_id):
 
     run = data_manager.get_run(run_id)
     models = data_manager.get_models(run["parameters"]["models"])
+    models_downloading = []
     for model in models:
         response = requests.post(f'{API_URL}/download/checkpoint', json={"model_id": model["model_id"], "s3_url": model["s3_url"]}, headers={"Content-Type": "application/json"})
         print("status", response.status_code)
+        if response.status_code == 202:
+            models_downloading.append(model)
 
-    models_copy = models[:]
-    while models_copy:
+    while models_downloading:
         i = 0
-        while i < len(models_copy):
-            response = requests.get(f'{API_URL}/download/checkpoint/status/{model["model_id"]}')
+        while i < len(models_downloading):
+            response = requests.get(f'{API_URL}/download/checkpoint/status/{models_downloading[i]["model_id"]}')
             print(response.status_code, response.json(), response.json()["status"])
             if response.json()["status"] == True:
-                models_copy.pop(i)
+                models_downloading.pop(i)
             else:
                 i += 1
         time.sleep(10)

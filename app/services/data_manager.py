@@ -387,18 +387,23 @@ class DataManager:
         response = self.experiment_runs_table.get_item(Key={"run_id": run_id})
         return response["Item"] if "Item" in response else None
     
-    def create_model(self, user_id: str, name: str, type: str, s3_url: str) -> dict:
+    def create_model(self, user_id: str, name: str, type: str, s3_url: str, model_id: str = None) -> dict:
         """
-        Creates a new model in the models table with the given user ID, name, and S3 URL.
+        Creates a new model in the models table with the given user ID, name, type, and S3 URL.
 
         Args:
             user_id (str): The ID of the user to create the model for.
             name (str): The name of the model.
+            type (str): The type of the model.
             s3_url (str): The S3 URL of the model.
+            model_id (str): The ID of the model, if None a new ID will be generated.
+
         Returns:
             dict: The model item from the models table.
         """
-        model_id = str(uuid.uuid4())
+        if model_id is None:
+            model_id = str(uuid.uuid4())
+
         self.models_table.put_item(Item={
             "model_id": model_id,
             "name": name,
@@ -526,7 +531,7 @@ class DataManager:
             UploadId=upload_id,
             MultipartUpload={"Parts": parts}
         )
-        return self.create_model(user_id, name, type, f"https://vango-models.s3-us-west-2.amazonaws.com/{model_id}")
+        return self.create_model(user_id, name, type, f"https://vango-models.s3-us-west-2.amazonaws.com/{model_id}", model_id)
 
     def get_images(self):
         objects = self.images_bucket.objects.filter(Prefix="images/sdxl_eval_1/")
