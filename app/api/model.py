@@ -46,7 +46,10 @@ def start_train_dreambooth(user_id):
         print(model_name, instance_prompt, liked_images)
 
         url = 'https://api.dreamlook.ai/dreambooth'
-        DREAMLOOK_API_KEY = "dl-418252CBBEDD464C8BA6B79258FF2E0C"
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+        DREAMLOOK_API_KEY = os.getenv('DREAMLOOK_API_KEY')
 
         headers = {
             'content-type': 'application/json',
