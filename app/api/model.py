@@ -74,14 +74,14 @@ def start_train_dreambooth(user_id):
         import requests
         response = requests.post(url, headers=headers, json=data)
         print(response.json())
-        train_jobs[response.json()['job_id']] = model_name
+        train_jobs[response.json()['job_id']] = {'user_id': user_id, 'model_name': model_name}
 
     except Exception as e:
         return {"error training dreambooth": str(e)}, 500
     return "", 200
 
 @model.route('/train/dreambooth/complete', methods=['POST'])
-def complete_train_dreambooth(user_id):
+def complete_train_dreambooth():
     data_manager = current_app.data_manager
     try:
         print('recieved callback')
