@@ -22,6 +22,7 @@ class DataManager:
         self.experiments_table = dynamodb.Table("Experiments")
         self.experiment_runs_table = dynamodb.Table("ExperimentRuns")
         self.models_table = dynamodb.Table("Models")
+        self.model_shares_table = dynamodb.Table("ModelShares")
     
     def create_user(self, google_id: str, email: str, name: str) -> dict:
         """
@@ -43,6 +44,7 @@ class DataManager:
             "subscription_plan": "Free",
             "credits": 1,
         })
+        self.share_model("b6df4801-e932-4e28-b03a-fbb809637bd3", "0dea49ef-abf9-4e73-8e2c-34fc529e2c9c", user_id) # share sdxl
         return self.get_user(user_id)
     
     def user_id_exists(self, user_id: str) -> bool:
@@ -385,7 +387,7 @@ class DataManager:
         response = self.experiment_runs_table.get_item(Key={"run_id": run_id})
         return response["Item"] if "Item" in response else None
     
-    def create_model(self, user_id: str, name: str, s3_url: str) -> dict:
+    def create_model(self, user_id: str, name: str, type: str, s3_url: str) -> dict:
         """
         Creates a new model in the models table with the given user ID, name, and S3 URL.
 
@@ -400,6 +402,7 @@ class DataManager:
         self.models_table.put_item(Item={
             "model_id": model_id,
             "name": name,
+            "type": type,
             "owner_id": user_id,
             "s3_url": s3_url,
             "last_edited": datetime.datetime.utcnow().isoformat() + "Z",
@@ -441,7 +444,7 @@ class DataManager:
 
     def list_models(self, user_id: str) -> dict:
         """
-        Retrieves all models from the models table for the given user ID.
+        Retrieves all models for the given user ID.
 
         Args:
             user_id (str): The ID of the user to retrieve models for.
@@ -449,11 +452,36 @@ class DataManager:
         Returns:
             dict: A dictionary of model items from the models table.
         """
-        response = self.models_table.query(
+        # get all models owned by the user and all models shared with the user
+        owned_models = self.models_table.query(
             IndexName="owner_id_index",
             KeyConditionExpression=Key('owner_id').eq(user_id)
-        )
-        return response["Items"]
+        )["Items"]
+
+        shares = self.model_shares_table.query(
+            IndexName="to_id_index",
+            KeyConditionExpression=Key('to_id').eq(user_id)
+        )["Items"]
+        shared_models = self.get_models([share["model_id"] for share in shares]) if shares else []
+
+        return owned_models + shared_models
+    
+    def share_model(self, model_id: str, from_id: str, to_id: str) -> None:
+        """
+        Shares a model with another user.
+
+        Args:
+            model_id (str): The ID of the model to share.
+            from_id (str): The ID of the user sharing the model.
+            to_id (str): The ID of the user to share the model with.
+        """
+        self.model_shares_table.put_item(Item={
+            "share_id": str(uuid.uuid4()),
+            "model_id": model_id,
+            "from_id": from_id,
+            "to_id": to_id,
+            "last_edited": datetime.datetime.utcnow().isoformat() + "Z",
+        })
     
     def start_upload(self, num_parts: int) -> dict:
         """
@@ -483,7 +511,7 @@ class DataManager:
         
         return model_id, upload_id, presigned_urls
     
-    def complete_upload(self, user_id: str, model_id: str, name: str, upload_id: str, parts: list[dict]) -> None:
+    def complete_upload(self, user_id: str, model_id: str, name: str, type: str, upload_id: str, parts: list[dict]) -> None:
         """
         Completes an upload to the models bucket with the given model ID, upload ID, and parts.
 
@@ -498,7 +526,7 @@ class DataManager:
             UploadId=upload_id,
             MultipartUpload={"Parts": parts}
         )
-        return self.create_model(user_id, name, f"https://vango-models.s3-us-west-2.amazonaws.com/{model_id}")
+        return self.create_model(user_id, name, type, f"https://vango-models.s3-us-west-2.amazonaws.com/{model_id}")
 
     def get_images(self):
         objects = self.images_bucket.objects.filter(Prefix="images/sdxl_eval_1/")

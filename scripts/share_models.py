@@ -13,30 +13,30 @@ session = boto3.Session(
 
 dynamodb = session.resource('dynamodb')
 users_table = dynamodb.Table("Users")
-models_table = dynamodb.Table("Models")
+model_shares_table = dynamodb.Table("ModelShares")
 
 models = [
-    { 'name': 'Stable Diffusion XL v1.0', 's3_url': 'https://vango-models.s3.us-west-2.amazonaws.com/sd_xl_base_1.0.safetensors' },
+    { 'model_id': 'b6df4801-e932-4e28-b03a-fbb809637bd3', 'owner_id': '0dea49ef-abf9-4e73-8e2c-34fc529e2c9c' },
 ]
 
-response = users_table.scan()
-users = response['Items']
+# get all the users from the users table
+users = users_table.scan()['Items']
 
+# for each user, add a model share for each model
 for user in users:
-    owner_id = user['user_id']
-
     for model in models:
-        model_id = str(uuid.uuid4())
-        name = model['name']
-        s3_url = model['s3_url']
+        model_id = model['model_id']
+        owner_id = model['owner_id']
+        user_id = user['user_id']
+        model_share_id = str(uuid.uuid4())
         last_edited = datetime.now().isoformat() + "Z"
 
-        models_table.put_item(
+        model_shares_table.put_item(
             Item={
+                'share_id': model_share_id,
                 'model_id': model_id,
-                'name': name,
-                'owner_id': owner_id,
-                's3_url': s3_url,
+                'from_id': owner_id,
+                'to_id': user_id,
                 'last_edited': last_edited
             }
         )
